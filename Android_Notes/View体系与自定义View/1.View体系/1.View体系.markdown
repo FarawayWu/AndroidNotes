@@ -1,0 +1,184 @@
+## View体系
+### View与ViewGroup
+- View类是Android中各组件的基类。
+- ViewGroup继承于View。由多个View组成。
+  > 所以可以狭义的说Android中显示的视图由多个View，ViewGroup组成。广义上也可以说由多个View组成。
+- View的构造函数
+```java
+  /**
+  * 1.java代码动态new的构造函数。
+  */
+  public FarView(Context context) {
+    super(context);
+  }
+
+  /**
+  * 1.XML中申明的view的构造函数，attrs为申明参数
+  */
+  public FarView(Context context, AttributeSet attrs) {
+    super(context, attrs);
+  }
+
+  /**
+  * 1.当view有style属性时
+  */
+  public FarView(Context context, AttributeSet attrs, int defStyleAttr) {
+    super(context, attrs, defStyleAttr);
+  }
+
+  /**
+  * 1.API21后才会使用
+  * 2.当view有style属性时
+  */
+  public  FarView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+          super(context, attrs, defStyleAttr, defStyleRes);
+  }
+```
+  ### 坐标系
+  #### Android坐标系
+  ![Avatar](..\\..\\Z_Resources\Android坐标系.png)
+  在`MotionEvnet`中`getRawX(),getRawY()`获取的便是Android坐标系的值。
+  #### View坐标系
+  1. 获取View的宽高
+   ```java
+   width = getRight() - getLeft();
+   height =getBottom - getTop();
+   //View自身提供的方法,与上述计算一致的
+   public int getWidth(){
+     return mRight - mLeft;
+   }
+   public int getHeight(){
+     return mBottom - mTop;
+   }
+   ```
+  2. View自身的坐标
+  > - getLeft(); 
+  > - getTop();
+  > - getRight();
+  > - getBottom();
+
+  ### 颜色定义
+  android中颜色遵循ARGB标准，以8位16进制表示ARGB,A（透明度，0-255）, R(Red，0-255)，G(Green, 0-255)，B(Blue, 0-255)。
+  > - A(0-255), 透明 -> 透明
+  >  - R,G,B (0-255), 浅 -> 深
+  >  -  XML代码中以#开头表示16进制，java代码一般是0x开头
+ 
+ ### LayoutParams
+ 布局参数，父View根据子View的LayoutParams放置子View, 所以脱离ViewGroup去谈LayoutParams是没有意义的。因此有LinearLayout.LayoutParams和FrameLayout.Params;
+ #### MarginLayoutParmas
+ 和外边距有关的LayoutParams, 较于ViewGroup.LayoutParams只增加了外边距的支持。所以只要支持外边距的LayoutParams都继承了MraginLayoutParams。
+ > 属性优先级：margin > horizontalMarigin, verticalMargin > leftMargin, rightMrgin, bottomMargin, topMargin
+ #### LayoutParams与View如何建立联系
+ 1. 在XML中定义View
+ 2. 在java代码中定义
+```java
+/**
+* 
+*/
+  public void addView(View child) {
+    addView(child, -1);
+  }
+
+  public void addView(View child, int index) {
+    if(child == null) {
+      throw new IllegalArgumentException("");
+    }
+    LayoutParams params = child.getLayoutParmas();
+    if(parmas == null) {
+      //生成默认LayoutParams;
+      params = generateDefaultLayoutParams();
+      if(params == null) {
+              throw new IllegalArgumentException("");
+      }
+    }
+    addView(child, index, params);
+  }
+
+  public void addView(View child, int width, int height) {
+    final LayoutParams params = generateDefaultLayoutParams();  // 生成当前ViewGroup默认的LayoutParams
+    params.width = width;
+    params.height = height;
+    addView(child, -1, params);
+}
+
+public void addView(View child, LayoutParams params) {
+    addView(child, -1, params);
+}
+
+public void addView(View child, int index, LayoutParams params) {
+    if (child == null) {
+        throw new IllegalArgumentException("Cannot add a null child view to a ViewGroup");
+    }
+
+    // addViewInner() will call child.requestLayout() when setting the new LayoutParams
+    // therefore, we call requestLayout() on ourselves before, so that the child's request
+    // will be blocked at our level
+    requestLayout();
+    invalidate(true);
+    addViewInner(child, index, params, false);
+}
+
+public void addView(View child, int index, LayoutParams params) {
+    if (child == null) {
+        throw new IllegalArgumentException("Cannot add a null child view to a ViewGroup");
+    }
+
+    // addViewInner() will call child.requestLayout() when setting the new LayoutParams
+    // therefore, we call requestLayout() on ourselves before, so that the child's request
+    // will be blocked at our level
+    requestLayout();
+    invalidate(true);
+    addViewInner(child, index, params, false);
+}
+
+private void addViewInner(View child, int index, LayoutParams params,
+        boolean preventRequestLayout) {
+    .....
+    //校验parent是否不为null
+    if (child.getParent() != null) {
+            throw new IllegalStateException("The specified child already has a parent. " +
+                    "You must call removeView() on the child's parent first.");
+    }
+    if (mTransition != null) {
+        mTransition.addChild(this, child);
+    }
+
+    if (!checkLayoutParams(params)) { // ① 检查传入的LayoutParams是否合法
+        params = generateLayoutParams(params); // 如果传入的LayoutParams不合法，将进行转化操作
+    }
+
+    if (preventRequestLayout) { // ② 是否需要阻止重新执行布局流程
+        child.mLayoutParams = params; // 这不会引起子View重新布局（onMeasure->onLayout->onDraw）
+    } else {
+        child.setLayoutParams(params); // requestLayout（onMeasure->onLayout->onDraw）
+    }
+
+    if (index < 0) {
+        index = mChildrenCount;
+    }
+
+    addInArray(child, index);
+
+    // tell our children
+    if (preventRequestLayout) {
+        child.assignParent(this);
+    } else {
+        child.mParent = this;
+    }
+    .....
+}
+
+```
+
+### AttributeSet
+通过`<declare-styleable>`为自定义View添加属性
+```xml
+<resources>
+  <declare-styleable name = "xxxViewGroup">
+    <!--自定义属性-->
+    <attr name="layout_simple_attr" format="integer">
+    <!--使用系统预置属性-->
+    <attr name="android:layout_gravity">
+  </declare-styleable>
+</resources>
+```
